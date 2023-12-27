@@ -1,4 +1,5 @@
 from curses import meta
+from mimetypes import init
 import pandas as pd
 import torch
 import random
@@ -55,10 +56,53 @@ class MarkdownDataset(Dataset):
     def __len__(self):
         return len(self.meta_data)
     
-    def max_length_rule_base(self, input_ids, cell_type, rank):
-        if len(input_ids) > self.parameter.cell_max_length:
-            input_ids = input_ids[:self.parameter.cell_max_length]
-            cell_type = cell_type[:self.parameter.cell_max_length]
-            rank = rank[:self.parameter.cell_max_length]
-        return input_ids, cell_type, rank
+    def max_length_rule_base(self, cell_inputs, cell_type, rank):
+        init_length = [len(x) for x in cell_inputs]
+        total_max_length = self.seq_length - len(init_length)
+        min_length = total_max_length // len(init_length)
+        cell_length = self.search_length(init_length, 
+                                         min_length, 
+                                         total_max_length, 
+                                         len(init_length))
+        seq = []
+        for i in range(len(cell_inputs)):
+            if cell_type[i] == 0:
+                seq.append(self.tokenizer.cls_token_id)
+            else:
+                seq.append(self.tokenizer.sep_token_id)
+            if cell_length[i] > 0:
+                seq.extend(cell_inputs[i][:cell_length[i]])
+            
+        if len(seq) < self.seq_length:
+            seq_mask = [1] * len(seq)
+        else:
+            seq_mask = [1] * self.seq_length
+            seq = seq[:self.seq_length]
+        seq, seq_mask = np.array(seq, dtype=np.int), np.array(seq_mask, dtype=np.int)
+        target_mask = np.where((seq == self.tokenizer.cls_token_id) | (seq == self.tokenizer.sep_token_id), 1, 0)
+        target = np.zeros(self.seq_length, dtype=np.float32)
+        tmp = np.where(seq == self.tokenizer.cls_token_id) | (seq == self.tokenizer.sep_token_id)
+        target[tmp] = rank
+        return seq, seq_mask, target_mask, target
+    
+    @staticmethod
+    def search_length(init_length, min_length, total_max_length, cell_count, step=4, max_search_count=50):
+        if np.sum(init_length) <= total_max_length:
+            return init_length
+        
+        res= [min(init_length[i], min_length) for i in range(cell_count)]
+        for s_i in range(max_search_count):
+            tmp = [min(init_length[i], res[i] + step) for i in range(cell_count)]
+            if np.sum(res) <= total_max_length:
+                res = tmp
+            else:
+                break
+        for s_i in range(cell_count):
+            tmp = [i for i in res]
+            tmp[s_i] = min(init_length[s_i], tmp[s_i] + step)
+            if np.sum(tmp) <= total_max_length:
+                res = tmp
+            else:
+                break
+        return res
     
