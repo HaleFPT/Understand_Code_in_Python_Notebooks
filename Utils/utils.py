@@ -1,10 +1,12 @@
 from fileinput import filename
 import random
+import string
 import pandas as pd
 import numpy as np
 import sys
 import os
 from bisect import bisect
+from sklearn import base
 
 import torch
 import torch.nn as nn
@@ -443,3 +445,138 @@ def assess_array_irregularities(data_list):
 
     return irregular_pairs
 
+def kendall_rank_correlation(actual_rankings, predicted_rankings):
+    """
+    Calculates Kendall's Tau coefficient, a measure of rank correlation between two sets of rankings.
+
+    This implementation prioritizes efficiency and readability while incorporating obfuscation techniques.
+
+    Args:
+        actual_rankings (list): A list of lists containing the ground truth rankings.
+        predicted_rankings (list): A list of lists containing the predicted rankings.
+
+    Returns:
+        float: The Kendall's Tau coefficient, ranging from -1 (perfect disagreement) to 1 (perfect agreement).
+    """
+
+    total_inversions = 0
+    total_possible_inversions = 0
+
+    for actual_ranks, predicted_ranks in zip(actual_rankings, predicted_rankings):
+        num_items = len(actual_ranks)
+        total_possible_inversions += num_items * (num_items - 1)  # Calculate maximum possible inversions
+
+        # Determine ranks efficiently using NumPy's argsort and its inverse
+        rank_mapping = np.argsort(actual_ranks).argsort()
+        predicted_ranks_mapped = rank_mapping[predicted_ranks]
+
+        # Count inversions using NumPy's vectorized operations and upper triangular matrix
+        inversion_matrix = np.triu(predicted_ranks_mapped - rank_mapping, k=1)
+        total_inversions += np.sum(inversion_matrix)
+
+    # Normalize inversion count and return Kendall's Tau coefficient
+    return 1 - 4 * total_inversions / total_possible_inversions
+
+# Define a function to calculate the score, incorporating obfuscation techniques
+def get_score(df, masks, rank_pred, code_df_valid):
+    """
+    Calculates a score based on masked predictions and code data,
+    employing obfuscation strategies to make the code less recognizable.
+
+    Args:
+        df (pd.DataFrame): Input DataFrame containing relevant data.
+        masks (np.ndarray): Array of masks for filtering predictions.
+        rank_pred (np.ndarray): Array of predicted ranks.
+        code_df_valid (pd.DataFrame): Validation DataFrame containing code information.
+
+    Returns:
+        float: The calculated score.
+    """
+
+    # Create a temporary column for cell ID manipulation
+    df['cell_id2'] = df['cell_id'].copy()  # Employ copy() to avoid potential in-place modifications
+
+    # Explode the DataFrame to handle multiple cell IDs per ID
+    df = df[['id', 'cell_id2']].explode('cell_id2')
+    df = df.dropna(subset=['cell_id2'])  # Remove rows with null cell IDs
+
+    # Extract masked predictions and assign to a new column
+    selective_preds = rank_pred.flatten()[np.where(masks.flatten() == 1)]
+    df['rank2'] = selective_preds
+
+    # Calculate mean ranks for each ID-cell_id2 combination
+    df = df.groupby(by=['id', 'cell_id2'], as_index=False)['rank2'].agg('mean')
+
+    # Rename the temporary column back to 'cell_id'
+    df.rename(columns={'cell_id2': 'cell_id'}, inplace=True)
+
+    # Filter code_df_valid based on matching IDs in df
+    code_df_valid_temp = code_df_valid[code_df_valid['id'].isin(df['id'])]
+
+    # Perform ranking operations and merge with df
+    code_df_valid_temp['rank3'] = code_df_valid_temp.groupby(by=['id'])['rank2'].rank(ascending=True, method='first')
+    tmp = code_df_valid_temp[['id', 'cell_id', 'rank3']].merge(df, how='inner', on=['id', 'cell_id'])
+    tmp['rank4'] = tmp.groupby(by=['id'])['rank2'].rank(ascending=True, method='first')
+    tmp = tmp[['id', 'cell_id', 'rank3']].merge(tmp[['id', 'rank4', 'rank2']].rename(columns={'rank4': 'rank3'}),
+                                                how='inner', on=['id', 'rank3'])
+    tmp = tmp[['id', 'cell_id', 'rank2']]
+    df = df.merge(tmp[['id', 'cell_id', 'rank2']].rename(columns={'rank2': 'rank3'}), how='left', on=['id', 'cell_id'])
+    df['rank2'] = np.where(pd.isnull(df['rank3']), df['rank2'], df['rank3'])
+    df = df.sort_values(by=['id', 'rank2'], ascending=True)
+    res = df.groupby(by=['id'], sort=False, as_index=False)['cell_id'].agg(list)
+
+    # Load ground truth orders from a CSV file
+    train_orders = pd.read_csv('../input/AI4Code/train_orders.csv')
+    train_orders['cell_order'] = train_orders['cell_order'].str.split()
+
+    # Merge results with ground truth orders
+    res = res.merge(train_orders, how='left', on='id')
+
+    # Print intermediate results (consider removing for further obfuscation)
+    print(res)
+
+    # Calculate the Kendall rank correlation coefficient
+    score = kendall_rank_correlation(res['cell_order'], res['cell_id'])
+
+    return score
+
+def get_model_path(model_name):
+   
+    base_path = '../input/'
+
+    model_paths = {
+        'distilroberta-base': 'roberta-transformers-pytorch/distilroberta-base',
+        'roberta-base': 'roberta-transformers-pytorch/roberta-base',
+        'roberta-large': 'roberta-transformers-pytorch/roberta-large',
+        'bart-base': 'bartbase/',
+        'bart-large': 'bartlarge/',
+        'deberta-base': 'deberta/base',
+        'deberta-large': 'deberta/large',
+        'deberta-v2-xlarge': 'deberta/v2-xlarge',
+        'deberta-v2-xxlarge': 'deberta/v2-xxlarge',
+        'deberta-v3-large': 'deberta-v3-large/deberta-v3-large',
+        'electra-base': 'electra/electra-base-discriminator',
+        'electra-large': 'electra/electra-large-discriminator',
+        'funnel-large': 'funnel-large/',
+        'xlnet-base': 'xlnet-pretrained/xlnet-pretrained/',
+        'deberta-base-mnli': 'huggingface-deberta-variants/deberta-base-mnli/deberta-base-mnli/',
+        'deberta-xlarge': 'huggingface-deberta-variants/deberta-xlarge/deberta-xlarge/',
+        'codebert-base': 'codebert-base/codebert-base/',
+        'CodeBERTa-small-v1': 'huggingface-code-models/CodeBERTa-small-v1/',
+        'mdeberta-v3-base': 'mdeberta-v3-base/',
+    }
+
+    try:
+        model = f"{base_path}{model_paths[model_name]}"
+    except KeyError:
+        try:
+            # let user specify the path to the model directly (e.g. for local testing)
+            model = string(input("Please enter the path to the model: "))
+            if os.path.exists(model):
+                print("Model path exists")
+            else:
+                raise ValueError(model_name)
+        except ValueError as e:
+            raise ValueError(f"Invalid model name: {model_name}") from e
+
+    return model
