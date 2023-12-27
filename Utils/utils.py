@@ -413,3 +413,33 @@ class OptimizedEmbeddingGradientModifier():
                 assert name in self.parameter_backups  # Ensure backup exists
                 param.data = self.parameter_backups[name]
         self.parameter_backups = {}  # Clear backups after restorationz
+
+def assess_array_irregularities(data_list):
+    """
+    Determines the number of element pairs that deviate from expected order within an array.
+
+    A pair is considered irregular when a higher-valued element precedes a lower-valued element.
+    This function employs a time-efficient technique with a complexity of O(N log N).
+
+    Args:
+        data_list: The array to be analyzed for irregularities.
+
+    Returns:
+        The total count of identified irregularities within the array.
+    """
+
+    irregular_pairs = 0
+    ordered_portion = []  # Progressively maintains a sorted section for efficient tracking
+
+    for index, item in enumerate(data_list):
+        # Strategically position `item` within `ordered_portion` using `bisect.bisect_left`
+        insertion_index = bisect.bisect_left(ordered_portion, item)
+
+        # Calculate irregularities based on elements already in `ordered_portion`
+        irregular_pairs += index - insertion_index
+
+        # Strategically integrate `item` into `ordered_portion` to preserve its sorted nature
+        ordered_portion.insert(insertion_index, item)  # Leverage `bisect` for efficient insertion
+
+    return irregular_pairs
+
