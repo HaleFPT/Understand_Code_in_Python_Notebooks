@@ -119,56 +119,9 @@ class DataSplitter:
         return train_df
 
 
-# Define a custom logger class for flexible output handling
-class EnhancedOutputHandler:
-    """Manages output to both terminal and file, offering customization."""
-
-    def __init__(self):
-        """Initializes the logger with default output to stdout."""
-        self.primary_output = sys.stdout  # Capture standard output
-        self.secondary_output = None  # Prepare for optional file output
-
-    def activate_file_output(self, file_path, mode="w"):
-        """Activates writing to a file in addition to the terminal."""
-        self.secondary_output = open(file_path, mode)  # Open file for writing
-
-    def transmit_message(self, message, terminal_output=True, file_output=True):
-        """Writes the message to specified output destinations."""
-        if "\r" in message:  # Exclude carriage returns from file output
-            file_output = False
-
-        if terminal_output:
-            self.primary_output.write(message)  # Send to primary output
-            self.primary_output.flush()  # Ensure immediate visibility
-            # time.sleep(1)  # Uncomment for delayed terminal output (optional)
-
-        if file_output and self.secondary_output:
-            self.secondary_output.write(message)  # Send to file if active
-            self.secondary_output.flush()  # Ensure file updates
-
-    def synchronize_output(self):
-        """Ensures all pending output is written to both destinations."""
-        # This method is essential for Python 3 compatibility.
-        pass  # No additional actions required in this implementation
-
-
-def initiate_reproducibility(seed_value):
-    """Establishes consistent random behavior across multiple runs."""
-    random.seed(seed_value)  # Seed the Python random number generator
-    np.random.seed(seed_value)  # Seed NumPy's random number generator
-    torch.manual_seed(seed_value)  # Seed PyTorch's random number generator
-    os.environ["PYTHONHASHSEED"] = str(seed_value)  # Set Python hash seed
-
-    if torch.cuda.is_available():  # Additional setup for CUDA-enabled devices
-        torch.cuda.manual_seed(seed_value)  # Seed CUDA's random number generator
-        torch.cuda.manual_seed_all(seed_value)  # Ensure consistency across GPUs
-        # torch.backends.cudnn.enabled = False  # Uncomment for deterministic behavior (may impact performance)
-        torch.backends.cudnn.deterministic = True  # Enforce deterministic operations
-        torch.backends.cudnn.benchmark = False  # Disable performance-based optimization
-
-class ValueTracker(object): 
+class Logger(object):
     """
-    Accumulates and calculates the average of a sequence of values.
+    A class for logging messages to both the terminal and a file.
     """
 
     def __init__(self):
@@ -289,7 +242,7 @@ def worker_init_fn(worker_id):
     except:
         raise Exception("NumPy seed generator not intialized properly!")
     
-class EnhancedLoss(nn.Module):  # Class name modified for uniqueness
+class EnhancedLoss(nn.Module):  
     """
     Computes a loss function tailored for ranking tasks, incorporating masked elements.
     """
@@ -316,13 +269,10 @@ class EnhancedLoss(nn.Module):  # Class name modified for uniqueness
         # Calculate loss for each sample, averaging only over valid elements
         loss_per_sample = torch.sum(masked_errors, dim=1) / torch.sum(rank_mask, dim=1)
 
-        # Average loss across the batch
-        mean_loss = loss_per_sample.mean()
-
-        return mean_loss
-
+        # Return the mean error across all examples in the batch:
+        return torch.mean(loss_per_sample)
    
-class CustomLossFunction(nn.Module):
+class CustomBCELoss(nn.Module):
     """
     Calculates a custom binary cross-entropy loss, integrating a masked approach
     and optional class weighting.
@@ -363,84 +313,7 @@ class CustomLossFunction(nn.Module):
         if sample_weights is not None:
             combined_bce = combined_bce * sample_weights.unsqueeze(1)
 
-        # Calculate final loss, accounting for masked elements
-        masked_loss = torch.sum(combined_bce, dim=1) / torch.sum(validity_mask, dim=1)
-        average_loss = masked_loss.mean()
+        # Calculate mean loss across masked elements and then across the batch
+        loss = torch.sum(bce, dim=1) / torch.sum(mask, dim=1)
 
-        return average_loss
-    
-class OptimizedEmbeddingGradientModifier():
-    """
-    Implement a method to modify gradients of specific model parameters
-    for optimization purposes, inspired by techniques like FGM.
-    """
-
-    def __init__(self, model):
-        """
-        Initialize the modifier with the model to be optimized.
-
-        Args:
-            model (torch.nn.Module): The model to modify gradients for.
-        """
-        self.model = model
-        self.parameter_backups = {}  # Use a more descriptive variable name
-
-    def apply_modification(self, epsilon=1, target_embedding_name="emb"):
-            """
-            Modify gradients of parameters matching a specified name pattern.
-
-            Args:
-                epsilon (float, optional): Scaling factor for modifications. Defaults to 1.
-                target_embedding_name (str, optional): Name pattern to match parameters. Defaults to "emb".
-            """
-            for name, param in self.model.named_parameters():
-                if param.requires_grad and target_embedding_name in name and param.grad is not None:
-                    self.parameter_backups[name] = param.data.clone()  # Back up original values
-                    norm = torch.norm(param.grad)
-                    if norm != 0:
-                        modification_vector = epsilon * param.grad / max(norm, 1e-3)
-                        param.data.add_(modification_vector)  # Apply modification
-
-    def restore_parameters(self, target_embedding_name="emb"):
-        """
-        Restore backed-up parameter values.
-
-        Args:
-            target_embedding_name (str, optional): Name pattern to match parameters. Defaults to "emb".
-        """
-        for name, param in self.model.named_parameters():
-            if param.requires_grad and target_embedding_name in name and param.grad is not None:
-                assert name in self.parameter_backups  # Ensure backup exists
-                param.data = self.parameter_backups[name]
-        self.parameter_backups = {}  # Clear backups after restoration
-
-def count_enhanced_inversions(data_list): 
-    """
-    Computes the number of inversions in a given list efficiently.
-
-    An inversion is a pair of elements (i, j) where i appears before j in the input list,
-    but i > j in value.
-
-    Uses a modified merge sort-like approach to count inversions iteratively.
-
-    Args:
-        data_list: A list of comparable elements.
-
-    Returns:
-        The total number of inversions in the list.
-    """
-
-    inversion_count = 0
-    sorted_prefix = []  # Holds the sorted portion of the list so far
-
-    for index, element in enumerate(data_list):
-        # Find the insertion point for the current element in the sorted prefix using bisect
-        insertion_point = bisect.bisect_left(sorted_prefix, element)  # O(log N)
-
-        # Calculate the number of inversions caused by this element
-        inversion_count += index - insertion_point
-
-        # Insert the element at the correct position in the sorted prefix
-        sorted_prefix.insert(insertion_point, element)  # O(N)
-
-    return inversion_count
+        return torch.mean(loss)
