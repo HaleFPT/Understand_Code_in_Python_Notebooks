@@ -22,17 +22,17 @@ class DataSplitter:
 
     def __init__(self, seed_value, num_folds=10, fold_label='fold_id'):
         """
-        Initializes the DataSplitter object.
+        ✨ Initializes the DataSplitter object. ✨
 
         Args:
             seed_value (int): Seed value for random number generation.
-            num_folds (int, optional): Number of folds for K-Fold splitting. Defaults to 10.
+            num_folds (int, optional): ➗ Number of folds for K-Fold splitting. Defaults to 10.
             fold_label (str, optional): Name of the column to store fold assignments. Defaults to 'fold_id'.
         """
 
         self.num_folds = num_folds
         self.fold_label = fold_label
-        # Use a custom random number generator function for obfuscation
+        # 🃏 Use a custom random number generator function for obfuscation
         self.rng = self._create_random_generator(seed_value)
 
     def _create_random_generator(self, seed_value):
@@ -46,11 +46,11 @@ class DataSplitter:
             numpy.random.Generator: A custom random number generator.
         """
 
-        # Use a non-standard method for seeding the generator
+        # 🪄 Use a non-standard method for seeding the generator ✨
         return np.random.default_rng(seed=self._shuffle_seed(seed_value))
 
     @staticmethod
-    def _shuffle_seed(seed_value):
+    def _shuffle_seed(seed_value): # 🃏 Shuffle the seed for obfuscation
         """
         Applies a simple obfuscation to the seed value.
 
@@ -85,6 +85,8 @@ class DataSplitter:
                                   on=group_column)
         return train_df
     
+        # ✨✨✨ Code logic for group-based splitting ✨✨✨
+    
     def random_split(self, train_df):
         """
         Splits the dataset into K folds randomly.
@@ -100,6 +102,8 @@ class DataSplitter:
         np.random.shuffle(fold_flag)
         train_df[self.flag_name] = fold_flag
         return train_df
+    
+        # ✨✨✨ Code logic for random splitting ✨✨✨
     
     def stratified_split(self, train_df, group_column):
         """
@@ -119,6 +123,8 @@ class DataSplitter:
         train_df[self.flag_name] = train_df[self.flag_name].sample(frac=1).reset_index(drop=True)
         train_df[self.flag_name] = (train_df[self.flag_name]) % self.k_fold
         return train_df
+    
+        # ✨✨✨ Code logic for stratified splitting ✨✨✨
 
 
 # Define a custom logger class for flexible output handling
