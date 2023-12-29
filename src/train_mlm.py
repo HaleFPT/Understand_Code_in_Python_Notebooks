@@ -159,7 +159,7 @@ def train(model_name, max_length, num_epochs, learning_rate, batch_size, n_accum
 
     print("==========Loading Data===========")
 
-    train_df = pd.read_pickle('../input/ai4codetrainpicklefile/train_df.pkl')
+    train_df = pd.read_pickle('/media/thanhha/Utilities/Thanhha/Understand_Code_in_Python_Notebooks/input/ai4codetrainpicklefile/train_df.pkl')
     train_df = preprocess_df(train_df)
     # train_df['source'] = train_df['source'].apply(lambda x:x[:1000])
     train_df = pd.concat(

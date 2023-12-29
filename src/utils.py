@@ -252,7 +252,7 @@ def get_score(df, masks, rank_pred, code_df_valid):
     df = df.sort_values(by=['id', 'rank2'], ascending=True)
     res = df.groupby(by=['id'], sort=False, as_index=False)['cell_id'].agg(list)
 
-    train_orders = pd.read_csv('../input/AI4Code/train_orders.csv')
+    train_orders = pd.read_csv('/media/thanhha/Utilities/Thanhha/Understand_Code_in_Python_Notebooks/input/AI4Code/train_orders.csv')
     train_orders['cell_order'] = train_orders['cell_order'].str.split()
     res = res.merge(train_orders, how='left', on='id')
     print(res)
@@ -261,7 +261,7 @@ def get_score(df, masks, rank_pred, code_df_valid):
 
 
 def get_model_path(model_name):
-    res = '../input/'
+    res = '/media/thanhha/Utilities/Thanhha/Understand_Code_in_Python_Notebooks/input/'
     if model_name in ['distilroberta-base', 'roberta-base', 'roberta-large']:
         res += 'roberta-transformers-pytorch/' + model_name
     elif model_name in ['bart-base', 'bart-large']:

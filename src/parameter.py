@@ -5,7 +5,7 @@ class Parameter(object):
     def __init__(self):
         # data
         self.result_dir = './user_data/'
-        self.data_dir = '../input/AI4Code/'
+        self.data_dir = '/media/thanhha/Utilities/Thanhha/Understand_Code_in_Python_Notebooks/input/AI4Code/'
         self.k_folds = 5
         self.n_jobs = 4
         self.random_seed = 27

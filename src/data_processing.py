@@ -16,12 +16,12 @@ parameter = Parameter()
 
 
 def get_data(seed=27, mode=0):
-    if os.path.exists('../input/ai4codetrainpicklefile/train_df.pkl'):
-        train_df = pd.read_pickle('../input/ai4codetrainpicklefile/train_df.pkl')
+    if os.path.exists('/media/thanhha/Utilities/Thanhha/Understand_Code_in_Python_Notebooks/input/ai4codetrainpicklefile/train_df.pkl'):
+        train_df = pd.read_pickle('/media/thanhha/Utilities/Thanhha/Understand_Code_in_Python_Notebooks/input/ai4codetrainpicklefile/train_df.pkl')
     else:
         train_df = read_json_data(mode='train')
-        train_orders = pd.read_csv('../input/AI4Code/' + 'train_orders.csv')
-        train_ancestors = pd.read_csv('../input/AI4Code/' + 'train_ancestors.csv')
+        train_orders = pd.read_csv('/media/thanhha/Utilities/Thanhha/Understand_Code_in_Python_Notebooks/input/AI4Code/' + 'train_orders.csv')
+        train_ancestors = pd.read_csv('/media/thanhha/Utilities/Thanhha/Understand_Code_in_Python_Notebooks/input/AI4Code/' + 'train_ancestors.csv')
 
         train_orders['cell_id'] = train_orders['cell_order'].str.split()
         train_orders = train_orders.explode(column='cell_id')
